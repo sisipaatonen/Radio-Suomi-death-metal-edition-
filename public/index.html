@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Radio Suomi · Death Metal Edition</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <h1>☠ Radio&nbsp;Suomi <span>Death Metal Edition</span></h1>
+        <p class="tagline">Only the talk. The rest is death metal.</p>
+      </header>
+
+      <section class="now">
+        <div id="mode" class="mode radio">RADIO</div>
+        <div id="nowPlaying" class="now-playing">Press start to begin.</div>
+      </section>
+
+      <section class="controls">
+        <button id="startBtn" class="primary">▶ Start</button>
+        <button id="stopBtn" class="ghost" disabled>■ Stop</button>
+        <button id="skipBtn" class="ghost" disabled>⏭ Skip metal</button>
+      </section>
+
+      <section class="override">
+        <span class="label">Mode</span>
+        <div class="seg">
+          <button data-mode="auto" class="active">Auto</button>
+          <button data-mode="radio">Force radio</button>
+          <button data-mode="metal">Force metal</button>
+        </div>
+      </section>
+
+      <section class="meter-wrap">
+        <div class="meter-head">
+          <span class="label">Music probability</span>
+          <span id="probVal" class="prob">–</span>
+        </div>
+        <div class="meter">
+          <div id="meterFill" class="meter-fill"></div>
+          <div id="threshMark" class="thresh-mark"></div>
+        </div>
+        <div class="slider-row">
+          <label for="threshold">Sensitivity (threshold)</label>
+          <input id="threshold" type="range" min="0.2" max="0.85" step="0.01" value="0.55" />
+          <span id="threshLabel">0.55</span>
+        </div>
+        <div id="metrics" class="metrics"></div>
+      </section>
+
+      <section class="playlist">
+        <span class="label">Death metal source (YouTube)</span>
+        <textarea
+          id="ytInput"
+          rows="3"
+          placeholder="Paste a YouTube playlist URL, or one or more video URLs / IDs (one per line or comma-separated)."
+        ></textarea>
+        <div class="playlist-actions">
+          <button id="saveYt" class="ghost">Save</button>
+          <span id="ytStatus" class=" yt-status"></span>
+        </div>
+      </section>
+
+      <section class="log-wrap">
+        <span class="label">Activity</span>
+        <div id="log" class="log"></div>
+      </section>
+
+      <footer>
+        <span>Personal use · YLE Radio Suomi speech + classic death metal</span>
+      </footer>
+    </div>
+
+    <!-- Hidden YouTube player host -->
+    <div id="ytHost" aria-hidden="true"></div>
+    <!-- Same-origin proxied radio audio -->
+    <audio id="radio" preload="none"></audio>
+
+    <script src="app.js"></script>
+  </body>
+</html>
