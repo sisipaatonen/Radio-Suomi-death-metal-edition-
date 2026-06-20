@@ -8,9 +8,38 @@ const { WebSocketServer } = require('ws');
 const config = require('./config');
 const { MediaEngine } = require('./mediaEngine');
 const { Detector } = require('./detector');
+const { resolvePlaylist } = require('./playlist');
 
 const app = express();
 app.use(express.static(path.join(__dirname, '..', 'public')));
+
+// Resolve the configured death metal source into a concrete, ordered list of
+// YouTube video IDs the browser can shuffle and play itself (reliable shuffle +
+// pause/resume, no dependence on the IFrame API's flaky native shuffle).
+// Manual YT_VIDEO_IDS win; otherwise YT_PLAYLIST_ID is scraped and cached.
+let metalCache = { ids: [], ts: 0 };
+const METAL_TTL_MS = 60 * 60 * 1000;
+
+app.get('/api/metal', async (_req, res) => {
+  const { playlistId, videoIds } = config.deathMetal;
+  if (videoIds.length) return res.json({ source: 'ids', playlistId: '', videoIds });
+  if (!playlistId) return res.json({ source: 'none', playlistId: '', videoIds: [] });
+
+  if (metalCache.ids.length && Date.now() - metalCache.ts < METAL_TTL_MS) {
+    return res.json({ source: 'playlist', playlistId, videoIds: metalCache.ids });
+  }
+  try {
+    const ids = await resolvePlaylist(playlistId);
+    if (ids.length) metalCache = { ids, ts: Date.now() };
+    else console.warn('[playlist] scrape returned 0 video IDs (consent cookie stale or layout changed?)');
+    res.json({ source: 'playlist', playlistId, videoIds: ids.length ? ids : metalCache.ids });
+  } catch (e) {
+    console.error('[playlist] resolve failed:', e.message);
+    // Fall back to any stale cache; the client falls back to native playlist
+    // playback (still seeded with playlistId) if the list is empty.
+    res.json({ source: 'playlist-error', playlistId, videoIds: metalCache.ids, error: e.message });
+  }
+});
 
 // Expose the (optionally pre-seeded) death metal config + detection defaults
 // so the browser can start without any manual setup if env vars are present.

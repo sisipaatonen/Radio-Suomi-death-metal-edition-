@@ -25,7 +25,7 @@ const config = {
     videoIds: (process.env.YT_VIDEO_IDS || '')
       .split(',')
       .map((s) => s.trim())
-      .filter(Boolean),
+      .filter((s) => /^[A-Za-z0-9_-]{11}$/.test(s)),
   },
 };
 
