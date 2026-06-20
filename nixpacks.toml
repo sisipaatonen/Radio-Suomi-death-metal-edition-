@@ -1,0 +1,5 @@
+# Install a dynamically-linked system ffmpeg on Railway. The server prefers it
+# over the bundled ffmpeg-static, whose static glibc build segfaults during DNS
+# resolution on modern hosts. aptPkgs is additive to the Node setup phase.
+[phases.setup]
+aptPkgs = ["ffmpeg"]

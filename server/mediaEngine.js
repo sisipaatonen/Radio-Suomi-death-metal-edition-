@@ -1,8 +1,21 @@
 'use strict';
 
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const { EventEmitter } = require('events');
-const ffmpegPath = require('ffmpeg-static');
+
+// Resolve which ffmpeg to use. Prefer an explicit FFMPEG_PATH, then a
+// dynamically-linked system ffmpeg, and only fall back to the bundled
+// ffmpeg-static. The static johnvansickle build segfaults during DNS
+// resolution (getaddrinfo) on modern glibc hosts, so a system ffmpeg is the
+// reliable choice whenever one is present.
+function resolveFfmpegPath() {
+  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
+  const sys = spawnSync('sh', ['-c', 'command -v ffmpeg'], { encoding: 'utf8' });
+  if (sys.status === 0 && sys.stdout.trim()) return sys.stdout.trim();
+  return require('ffmpeg-static');
+}
+
+const ffmpegPath = resolveFfmpegPath();
 
 // Runs a single ffmpeg process that pulls the upstream radio once and produces
 // two outputs from that one connection:
