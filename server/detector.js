@@ -31,25 +31,33 @@ const HF_LO_BIN = Math.round(10000 / BIN_HZ); // 10 kHz: cymbals/production -> m
 class Detector extends EventEmitter {
   constructor(opts = {}) {
     super();
-    this.musicThreshold = opts.musicThreshold ?? 0.55;
-    // Asymmetric hold: slow to switch INTO death metal (ride the host's 5-10 s
-    // crossfade), fast to cut BACK to radio the moment speech starts.
-    this.enterHoldSeconds = opts.enterHoldSeconds ?? 5;
+    // Schmitt-trigger thresholds on a smoothed probability. A dead-band between
+    // exit and enter stops the state flapping when a song dips momentarily
+    // (quiet verse, breakdown) or a stray musical sting appears during talk.
+    this.enterThreshold = opts.enterThreshold ?? 0.48; // speech -> music
+    this.exitThreshold = opts.exitThreshold ?? 0.3; // music -> speech
+    this.smoothing = opts.smoothing ?? 0.45; // EMA weight on the newest window
+    // Asymmetric hold: slow into death metal (ride the host's 5-10 s crossfade),
+    // quicker back to radio so the talk is not missed.
+    this.enterHoldSeconds = opts.enterHoldSeconds ?? 4;
     this.exitHoldSeconds = opts.exitHoldSeconds ?? 1;
-    this.switchHoldSeconds = opts.switchHoldSeconds ?? 3; // legacy/back-compat
 
     this._tail = Buffer.alloc(0); // leftover bytes between pushes
     this._frames = []; // feature objects for the current texture window
     this._prevMag = null; // previous magnitude spectrum (for flux)
+    this._probEMA = null; // smoothed music probability
 
     this.state = 'speech'; // public, debounced state
     this._candidate = null; // pending state awaiting hold
     this._candidateWindows = 0; // consecutive windows the candidate has held
   }
 
-  setConfig({ musicThreshold, enterHoldSeconds, exitHoldSeconds }) {
-    if (typeof musicThreshold === 'number') {
-      this.musicThreshold = Math.min(1, Math.max(0, musicThreshold));
+  setConfig({ enterThreshold, exitThreshold, enterHoldSeconds, exitHoldSeconds }) {
+    if (typeof enterThreshold === 'number') {
+      this.enterThreshold = Math.min(1, Math.max(0, enterThreshold));
+    }
+    if (typeof exitThreshold === 'number') {
+      this.exitThreshold = Math.min(1, Math.max(0, exitThreshold));
     }
     if (typeof enterHoldSeconds === 'number') {
       this.enterHoldSeconds = Math.min(30, Math.max(0, enterHoldSeconds));
@@ -176,16 +184,27 @@ class Detector extends EventEmitter {
     const m5 = clamp01(subBassRatio / 0.18); // strong sub-bass -> music
     const m6 = clamp01(highFreqRatio / 0.06); // >10 kHz -> music (weak on bandlimited radio)
 
-    // Weighted blend, tuned on labeled YLE talk vs music. LSTER and sub-bass are
-    // the strongest discriminators; >10 kHz barely separates on codec-limited
-    // streams so it carries only a small weight (honours the idea without noise).
+    // Weighted blend, tuned on real Radio Suomi audio. SUB-BASS dominates: it is
+    // the reliable music cue (kick/bass present in songs, absent in talk). LSTER
+    // is demoted because beat-driven music has many low-energy frames and was
+    // wrongly dragging real music toward "speech" (the random-switching bug).
     const musicProb = clamp01(
-      0.34 * m1 + 0.12 * m2 + 0.12 * m3 + 0.1 * m4 + 0.27 * m5 + 0.05 * m6
+      0.18 * m1 + 0.1 * m2 + 0.08 * m3 + 0.06 * m4 + 0.5 * m5 + 0.08 * m6
     );
 
-    // Near-silence is ambiguous; treat as speech (a pause), don't trigger metal.
+    // Smooth (EMA) then apply the Schmitt trigger: only cross INTO music above
+    // enterThreshold and back to speech below exitThreshold. The dead-band kills
+    // the flapping. Near-silence is treated as speech (don't play metal over a
+    // dead-air gap).
+    this._probEMA =
+      this._probEMA == null ? musicProb : this.smoothing * musicProb + (1 - this.smoothing) * this._probEMA;
+    const smooth = this._probEMA;
     const silent = eAvg < 1e-5;
-    const rawState = !silent && musicProb >= this.musicThreshold ? 'music' : 'speech';
+
+    let rawState = this.state;
+    if (silent) rawState = 'speech';
+    else if (this.state !== 'music' && smooth >= this.enterThreshold) rawState = 'music';
+    else if (this.state === 'music' && smooth < this.exitThreshold) rawState = 'speech';
 
     this._applyHysteresis(rawState);
 
@@ -193,6 +212,7 @@ class Detector extends EventEmitter {
       state: this.state,
       rawState,
       musicProb: round(musicProb),
+      smoothProb: round(smooth),
       metrics: {
         lster: round(lster),
         hzcrr: round(hzcrr),
@@ -202,7 +222,8 @@ class Detector extends EventEmitter {
         highFreq: round(highFreqRatio),
         level: round(Math.sqrt(eAvg)),
       },
-      threshold: this.musicThreshold,
+      enterThreshold: this.enterThreshold,
+      exitThreshold: this.exitThreshold,
       ts: Date.now(),
     });
   }

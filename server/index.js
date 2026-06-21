@@ -47,7 +47,8 @@ app.get('/api/config', (_req, res) => {
   res.json({
     deathMetal: config.deathMetal,
     detection: {
-      musicThreshold: detector.musicThreshold,
+      enterThreshold: detector.enterThreshold,
+      exitThreshold: detector.exitThreshold,
       enterHoldSeconds: detector.enterHoldSeconds,
       exitHoldSeconds: detector.exitHoldSeconds,
     },
@@ -67,7 +68,8 @@ const media = new MediaEngine({
 });
 
 const detector = new Detector({
-  musicThreshold: config.detection.musicThreshold,
+  enterThreshold: config.detection.enterThreshold,
+  exitThreshold: config.detection.exitThreshold,
   enterHoldSeconds: config.detection.enterHoldSeconds,
   exitHoldSeconds: config.detection.exitHoldSeconds,
 });
@@ -92,9 +94,8 @@ wss.on('connection', (ws) => {
     JSON.stringify({
       type: 'hello',
       state: detector.state,
-      threshold: detector.musicThreshold,
-      enterHoldSeconds: detector.enterHoldSeconds,
-      exitHoldSeconds: detector.exitHoldSeconds,
+      enterThreshold: detector.enterThreshold,
+      exitThreshold: detector.exitThreshold,
     })
   );
 
@@ -107,15 +108,15 @@ wss.on('connection', (ws) => {
     }
     if (msg.type === 'setConfig') {
       detector.setConfig({
-        musicThreshold: msg.musicThreshold,
+        enterThreshold: msg.enterThreshold,
+        exitThreshold: msg.exitThreshold,
         enterHoldSeconds: msg.enterHoldSeconds,
         exitHoldSeconds: msg.exitHoldSeconds,
       });
       broadcastWS({
         type: 'configUpdated',
-        threshold: detector.musicThreshold,
-        enterHoldSeconds: detector.enterHoldSeconds,
-        exitHoldSeconds: detector.exitHoldSeconds,
+        enterThreshold: detector.enterThreshold,
+        exitThreshold: detector.exitThreshold,
       });
     }
   });
