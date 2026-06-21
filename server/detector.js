@@ -17,16 +17,26 @@ const { magnitudeSpectrum } = require('./fft');
 // These are combined into a single musicProbability in [0,1]. A hysteresis
 // timer prevents the output state from flapping on short pauses / breaks.
 
-const SAMPLE_RATE = 16000;
-const FRAME = 512; // ~32 ms
-const HOP = 256; // ~16 ms
+const SAMPLE_RATE = 32000;
+const FRAME = 1024; // ~32 ms
+const HOP = 512; // ~16 ms
 const FRAMES_PER_WINDOW = Math.round(SAMPLE_RATE / HOP); // ~1 second of frames
+
+// Spectral band bins for the FRAME-point FFT (mag length = FRAME/2).
+const BIN_HZ = SAMPLE_RATE / FRAME; // ~31.25 Hz/bin
+const SUB_LO_BIN = 1; // ~31 Hz   } sub-bass: kick/bass energy -> music
+const SUB_HI_BIN = Math.round(110 / BIN_HZ); // ~110 Hz
+const HF_LO_BIN = Math.round(10000 / BIN_HZ); // 10 kHz: cymbals/production -> music
 
 class Detector extends EventEmitter {
   constructor(opts = {}) {
     super();
     this.musicThreshold = opts.musicThreshold ?? 0.55;
-    this.switchHoldSeconds = opts.switchHoldSeconds ?? 3;
+    // Asymmetric hold: slow to switch INTO death metal (ride the host's 5-10 s
+    // crossfade), fast to cut BACK to radio the moment speech starts.
+    this.enterHoldSeconds = opts.enterHoldSeconds ?? 5;
+    this.exitHoldSeconds = opts.exitHoldSeconds ?? 1;
+    this.switchHoldSeconds = opts.switchHoldSeconds ?? 3; // legacy/back-compat
 
     this._tail = Buffer.alloc(0); // leftover bytes between pushes
     this._frames = []; // feature objects for the current texture window
@@ -37,12 +47,15 @@ class Detector extends EventEmitter {
     this._candidateWindows = 0; // consecutive windows the candidate has held
   }
 
-  setConfig({ musicThreshold, switchHoldSeconds }) {
+  setConfig({ musicThreshold, enterHoldSeconds, exitHoldSeconds }) {
     if (typeof musicThreshold === 'number') {
       this.musicThreshold = Math.min(1, Math.max(0, musicThreshold));
     }
-    if (typeof switchHoldSeconds === 'number') {
-      this.switchHoldSeconds = Math.min(30, Math.max(0, switchHoldSeconds));
+    if (typeof enterHoldSeconds === 'number') {
+      this.enterHoldSeconds = Math.min(30, Math.max(0, enterHoldSeconds));
+    }
+    if (typeof exitHoldSeconds === 'number') {
+      this.exitHoldSeconds = Math.min(30, Math.max(0, exitHoldSeconds));
     }
   }
 
@@ -96,7 +109,16 @@ class Detector extends EventEmitter {
     }
     this._prevMag = mag;
 
-    this._frames.push({ energy, zcr, centroid, flux });
+    // Band energies (skip DC bin 0). Sub-bass and >10 kHz favour music.
+    let totalMag = 0;
+    let subMag = 0;
+    let hfMag = 0;
+    for (let i = 1; i < mag.length; i++) {
+      totalMag += mag[i];
+      if (i >= SUB_LO_BIN && i <= SUB_HI_BIN) subMag += mag[i];
+      if (i >= HF_LO_BIN) hfMag += mag[i];
+    }
+    this._frames.push({ energy, zcr, centroid, flux, subMag, hfMag, totalMag });
     if (this._frames.length >= FRAMES_PER_WINDOW) this._finishWindow();
   }
 
@@ -121,6 +143,9 @@ class Detector extends EventEmitter {
     let eVar = 0;
     let fluxSum = 0;
     let fluxSq = 0;
+    let subMagSum = 0;
+    let hfMagSum = 0;
+    let totMagSum = 0;
     for (const f of frames) {
       if (f.energy < 0.5 * eAvg) lowE++;
       if (f.zcr > 1.5 * zAvg) highZ++;
@@ -128,7 +153,14 @@ class Detector extends EventEmitter {
       eVar += de * de;
       fluxSum += f.flux;
       fluxSq += f.flux * f.flux;
+      subMagSum += f.subMag;
+      hfMagSum += f.hfMag;
+      totMagSum += f.totalMag;
     }
+    // Energy-weighted band ratios over the whole window, so near-silent speech
+    // pauses (where a per-frame ratio is just noise) don't inflate the bands.
+    const subBassRatio = totMagSum > 0 ? subMagSum / totMagSum : 0;
+    const highFreqRatio = totMagSum > 0 ? hfMagSum / totMagSum : 0;
     const lster = lowE / n;
     const hzcrr = highZ / n;
     const energyCV = eAvg > 0 ? Math.sqrt(eVar / n) / eAvg : 0;
@@ -141,9 +173,15 @@ class Detector extends EventEmitter {
     const m2 = 1 - clamp01(hzcrr / 0.18); // high HZCRR -> speech
     const m3 = 1 - clamp01(energyCV / 1.4); // high energy CV -> speech
     const m4 = 1 - clamp01(fluxCV / 1.6); // steady flux -> music
+    const m5 = clamp01(subBassRatio / 0.18); // strong sub-bass -> music
+    const m6 = clamp01(highFreqRatio / 0.06); // >10 kHz -> music (weak on bandlimited radio)
 
-    // Weighted blend. LSTER is the strongest classic indicator.
-    const musicProb = clamp01(0.4 * m1 + 0.25 * m2 + 0.2 * m3 + 0.15 * m4);
+    // Weighted blend, tuned on labeled YLE talk vs music. LSTER and sub-bass are
+    // the strongest discriminators; >10 kHz barely separates on codec-limited
+    // streams so it carries only a small weight (honours the idea without noise).
+    const musicProb = clamp01(
+      0.34 * m1 + 0.12 * m2 + 0.12 * m3 + 0.1 * m4 + 0.27 * m5 + 0.05 * m6
+    );
 
     // Near-silence is ambiguous; treat as speech (a pause), don't trigger metal.
     const silent = eAvg < 1e-5;
@@ -160,6 +198,8 @@ class Detector extends EventEmitter {
         hzcrr: round(hzcrr),
         energyCV: round(energyCV),
         fluxCV: round(fluxCV),
+        subBass: round(subBassRatio),
+        highFreq: round(highFreqRatio),
         level: round(Math.sqrt(eAvg)),
       },
       threshold: this.musicThreshold,
@@ -182,7 +222,10 @@ class Detector extends EventEmitter {
       return;
     }
     this._candidateWindows++;
-    if (this._candidateWindows >= Math.max(1, Math.round(this.switchHoldSeconds))) {
+    // Asymmetric: switching to 'music' (into death metal) needs enterHold; back
+    // to 'speech' needs only exitHold so the radio talk is cut in fast.
+    const holdSec = rawState === 'music' ? this.enterHoldSeconds : this.exitHoldSeconds;
+    if (this._candidateWindows >= Math.max(1, Math.round(holdSec))) {
       this.state = rawState;
       this._candidate = null;
       this._candidateWindows = 0;

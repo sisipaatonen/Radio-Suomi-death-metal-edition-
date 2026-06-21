@@ -15,9 +15,13 @@ const config = {
 
   detection: {
     // Music probability (0..1) above which we treat audio as music.
-    musicThreshold: clampNum(process.env.MUSIC_THRESHOLD, 0.55, 0, 1),
-    // How long (seconds) a new state must hold before we switch.
-    switchHoldSeconds: clampNum(process.env.SWITCH_HOLD_SECONDS, 3, 0, 30),
+    musicThreshold: clampNum(process.env.MUSIC_THRESHOLD, 0.4, 0, 1),
+    // Seconds of sustained music before switching INTO death metal (rides the
+    // host's 5-10 s crossfade so we don't jump on a brief sting).
+    enterHoldSeconds: clampNum(process.env.MUSIC_ENTER_HOLD_SECONDS, 5, 0, 30),
+    // Seconds of sustained speech before cutting BACK to radio (kept short so
+    // the talk is not missed). "As fast as possible" within the ~1 s window.
+    exitHoldSeconds: clampNum(process.env.MUSIC_EXIT_HOLD_SECONDS, 1, 0, 30),
   },
 
   deathMetal: {

@@ -48,7 +48,8 @@ app.get('/api/config', (_req, res) => {
     deathMetal: config.deathMetal,
     detection: {
       musicThreshold: detector.musicThreshold,
-      switchHoldSeconds: detector.switchHoldSeconds,
+      enterHoldSeconds: detector.enterHoldSeconds,
+      exitHoldSeconds: detector.exitHoldSeconds,
     },
   });
 });
@@ -67,7 +68,8 @@ const media = new MediaEngine({
 
 const detector = new Detector({
   musicThreshold: config.detection.musicThreshold,
-  switchHoldSeconds: config.detection.switchHoldSeconds,
+  enterHoldSeconds: config.detection.enterHoldSeconds,
+  exitHoldSeconds: config.detection.exitHoldSeconds,
 });
 
 media.on('pcm', (chunk) => detector.push(chunk));
@@ -91,7 +93,8 @@ wss.on('connection', (ws) => {
       type: 'hello',
       state: detector.state,
       threshold: detector.musicThreshold,
-      switchHoldSeconds: detector.switchHoldSeconds,
+      enterHoldSeconds: detector.enterHoldSeconds,
+      exitHoldSeconds: detector.exitHoldSeconds,
     })
   );
 
@@ -105,12 +108,14 @@ wss.on('connection', (ws) => {
     if (msg.type === 'setConfig') {
       detector.setConfig({
         musicThreshold: msg.musicThreshold,
-        switchHoldSeconds: msg.switchHoldSeconds,
+        enterHoldSeconds: msg.enterHoldSeconds,
+        exitHoldSeconds: msg.exitHoldSeconds,
       });
       broadcastWS({
         type: 'configUpdated',
         threshold: detector.musicThreshold,
-        switchHoldSeconds: detector.switchHoldSeconds,
+        enterHoldSeconds: detector.enterHoldSeconds,
+        exitHoldSeconds: detector.exitHoldSeconds,
       });
     }
   });

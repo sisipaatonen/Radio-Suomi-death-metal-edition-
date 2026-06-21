@@ -67,10 +67,11 @@ class MediaEngine extends EventEmitter {
       '-b:a', this.bitrate,
       '-f', 'mp3',
       'pipe:1',
-      // Output 2: PCM for analysis.
+      // Output 2: PCM for analysis. 32 kHz so the detector can see the
+      // 10-16 kHz band (music has energy there, speech rolls off ~8 kHz).
       '-map', '0:a:0',
       '-ac', '1',
-      '-ar', '16000',
+      '-ar', '32000',
       '-c:a', 'pcm_s16le',
       '-f', 's16le',
       'pipe:3',

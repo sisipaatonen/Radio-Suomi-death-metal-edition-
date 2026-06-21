@@ -1,77 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#050302">
-<title>Radio Suomi — Death Metal Edition</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=Oswald:wght@300;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <title>Radio Death Metal Suomi</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Metal+Mania&family=Pirata+One&family=Oswald:wght@300;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="is-radio">
+    <!-- photocopy / toner / grain texture layers (pure CSS, black & white) -->
+    <div class="grain" aria-hidden="true"></div>
+    <div class="halftone" aria-hidden="true"></div>
+    <div class="streak" aria-hidden="true"></div>
 
-  <!-- film grain / photocopy / smoke layers -->
-  <div class="grain" aria-hidden="true"></div>
-  <div class="smoke" aria-hidden="true"></div>
-  <div class="scanlines" aria-hidden="true"></div>
-  <div class="vignette" aria-hidden="true"></div>
+    <main class="sheet">
+      <!-- brand lockup: RADIO · [DEATH METAL] · SUOMI -->
+      <header class="lockup">
+        <p class="line line-top"><span>Radio</span></p>
+        <h1 class="mark" data-text="Death Metal">Death Metal</h1>
+        <p class="line line-bot"><span>Suomi</span></p>
+      </header>
 
-  <main class="tomb">
+      <!-- live state -->
+      <section class="console" aria-label="Now broadcasting">
+        <div id="mode" class="mode radio">Radio</div>
 
-    <header class="masthead">
-      <p class="kicker">Yle&nbsp;Radio&nbsp;Suomi · 102.4 FM</p>
-      <h1 class="logo" data-text="Death Metal">Death&nbsp;Metal</h1>
-      <p class="edition">EDITION</p>
-      <p class="creed">Only the talk. The rest is death&nbsp;metal.</p>
-    </header>
-
-    <section class="console" aria-label="Now broadcasting">
-
-      <div class="state-frame">
-        <span class="state-label">ON&nbsp;AIR</span>
-        <div id="mode" class="mode radio">RADIO</div>
-        <span class="state-sub" aria-hidden="true">signal status</span>
-      </div>
-
-      <!-- VU / intensity bar (decorative, JS sets meterFill width) -->
-      <div class="meter" role="presentation" aria-hidden="true">
-        <div id="meterFill" class="meter-fill"></div>
-        <div class="meter-ticks"></div>
-      </div>
-
-      <div class="now">
-        <span class="now-tag">NOW DESECRATING</span>
-        <div class="now-window">
-          <div id="nowPlaying" class="now-track">— silence before the slaughter —</div>
+        <div class="meter" role="presentation" aria-hidden="true">
+          <div id="meterFill" class="meter-fill"></div>
         </div>
-      </div>
 
-    </section>
+        <div class="now">
+          <span class="now-tag">Now playing</span>
+          <div class="now-window">
+            <div id="nowPlaying" class="now-track">— silence —</div>
+          </div>
+        </div>
+      </section>
 
-    <nav class="controls" aria-label="Playback">
-      <button id="playBtn" class="btn btn-play" type="button">
-        <span class="btn-glyph" aria-hidden="true">▶</span>
-        <span class="btn-text">Summon</span>
-      </button>
-      <button id="stopBtn" class="btn btn-stop" type="button">
-        <span class="btn-glyph" aria-hidden="true">■</span>
-        <span class="btn-text">Silence</span>
-      </button>
-    </nav>
+      <!-- exactly two controls -->
+      <nav class="controls" aria-label="Playback">
+        <button id="playBtn" class="btn" type="button">
+          <span class="btn-glyph" aria-hidden="true">&#9654;</span>
+          <span class="btn-text">Play</span>
+        </button>
+        <button id="stopBtn" class="btn" type="button">
+          <span class="btn-glyph" aria-hidden="true">&#9632;</span>
+          <span class="btn-text">Stop</span>
+        </button>
+      </nav>
+    </main>
 
-    <footer class="foot">
-      <span class="foot-dot" aria-hidden="true"></span>
-      <span>talk → radio · music → death</span>
-    </footer>
+    <!-- required, hidden engine elements -->
+    <div id="ytHost" aria-hidden="true"></div>
+    <audio id="radio" preload="none"></audio>
 
-  </main>
-
-  <!-- required, hidden engine elements -->
-  <div id="ytHost" aria-hidden="true"></div>
-  <audio id="radio" preload="none"></audio>
-
-  <script src="app.js"></script>
-</body>
+    <script src="app.js"></script>
+  </body>
 </html>
