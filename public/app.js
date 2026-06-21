@@ -262,10 +262,16 @@ function onMetalEnded() {
 // Detection feed (WebSocket)
 // ---------------------------------------------------------------------------
 let ws = null;
+function wsSend(obj) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+}
 function connectWS() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}/ws`);
-  ws.onopen = () => log('detector connected');
+  ws.onopen = () => {
+    log('detector connected');
+    if (state.running) wsSend({ type: 'listening', on: true }); // survive reconnects
+  };
   ws.onclose = () => setTimeout(connectWS, 2000);
   ws.onmessage = (ev) => {
     let msg;
@@ -301,6 +307,7 @@ function start() {
   if (playBtn) playBtn.disabled = true;
   if (stopBtn) stopBtn.disabled = false;
   document.body.classList.add('is-running');
+  wsSend({ type: 'listening', on: true });
 
   // The click is our user gesture: start radio and unlock the YT player.
   setMode('radio');
@@ -321,6 +328,7 @@ function stop() {
   if (playBtn) playBtn.disabled = false;
   if (stopBtn) stopBtn.disabled = true;
   document.body.classList.remove('is-running');
+  wsSend({ type: 'listening', on: false });
 
   stopRadio();
   if (ytPlayer && ytPlayer.stopVideo) {

@@ -76,8 +76,28 @@ const detector = new Detector({
 
 media.on('pcm', (chunk) => detector.push(chunk));
 
+// Listener stats (in-memory; resets on redeploy). A browser counts as a
+// listener while it is actively playing — the client flags this over the WS.
+const stats = { peak: 0, totalSessions: 0, startedAt: Date.now() };
+
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
+
+function countListening() {
+  let n = 0;
+  for (const c of wss.clients) if (c.readyState === 1 && c.listening) n++;
+  return n;
+}
+
+app.get('/api/stats', (_req, res) => {
+  res.json({
+    listeners: countListening(),
+    openTabs: wss.clients.size,
+    peak: stats.peak,
+    totalSessions: stats.totalSessions,
+    uptimeSeconds: Math.floor((Date.now() - stats.startedAt) / 1000),
+  });
+});
 
 function broadcastWS(obj) {
   const msg = JSON.stringify(obj);
@@ -90,6 +110,7 @@ function broadcastWS(obj) {
 detector.on('analysis', (a) => broadcastWS({ type: 'analysis', ...a }));
 
 wss.on('connection', (ws) => {
+  ws.listening = false;
   ws.send(
     JSON.stringify({
       type: 'hello',
@@ -105,6 +126,14 @@ wss.on('connection', (ws) => {
       msg = JSON.parse(raw.toString());
     } catch (_) {
       return;
+    }
+    if (msg.type === 'listening') {
+      ws.listening = !!msg.on;
+      if (ws.listening) {
+        stats.totalSessions++;
+        const n = countListening();
+        if (n > stats.peak) stats.peak = n;
+      }
     }
     if (msg.type === 'setConfig') {
       detector.setConfig({
