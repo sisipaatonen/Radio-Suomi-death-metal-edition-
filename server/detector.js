@@ -24,8 +24,9 @@ const FRAMES_PER_WINDOW = Math.round(SAMPLE_RATE / HOP); // ~1 second of frames
 
 // Spectral band bins for the FRAME-point FFT (mag length = FRAME/2).
 const BIN_HZ = SAMPLE_RATE / FRAME; // ~31.25 Hz/bin
-const SUB_LO_BIN = 1; // ~31 Hz   } sub-bass: kick/bass energy -> music
-const SUB_HI_BIN = Math.round(110 / BIN_HZ); // ~110 Hz
+const SUB_LO_BIN = 1; // ~31 Hz   } TRUE sub-bass (kick/bass) -> music. Capped at
+const SUB_HI_BIN = Math.round(75 / BIN_HZ); // ~75 Hz, BELOW the male voice
+//   fundamental (~85-180 Hz) so a deep male speaker is not mistaken for music.
 const HF_LO_BIN = Math.round(10000 / BIN_HZ); // 10 kHz: cymbals/production -> music
 
 class Detector extends EventEmitter {
