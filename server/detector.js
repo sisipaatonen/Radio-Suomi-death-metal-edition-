@@ -34,12 +34,15 @@ class Detector extends EventEmitter {
     // Schmitt-trigger thresholds on a smoothed probability. A dead-band between
     // exit and enter stops the state flapping when a song dips momentarily
     // (quiet verse, breakdown) or a stray musical sting appears during talk.
-    this.enterThreshold = opts.enterThreshold ?? 0.48; // speech -> music
-    this.exitThreshold = opts.exitThreshold ?? 0.3; // music -> speech
+    // Tuned on real Radio Suomi: songs smooth to ~0.6-0.8, the DJ talk (often
+    // over a light music bed) sits ~0.40, so exit must be ~0.42 to catch it
+    // while songs stay safely above. The gap to enter (0.50) is the dead-band.
+    this.enterThreshold = opts.enterThreshold ?? 0.5; // speech -> music
+    this.exitThreshold = opts.exitThreshold ?? 0.42; // music -> speech
     this.smoothing = opts.smoothing ?? 0.45; // EMA weight on the newest window
     // Asymmetric hold: slow into death metal (ride the host's 5-10 s crossfade),
-    // quicker back to radio so the talk is not missed.
-    this.enterHoldSeconds = opts.enterHoldSeconds ?? 4;
+    // quick back to radio so the talk is not missed.
+    this.enterHoldSeconds = opts.enterHoldSeconds ?? 5;
     this.exitHoldSeconds = opts.exitHoldSeconds ?? 1;
 
     this._tail = Buffer.alloc(0); // leftover bytes between pushes

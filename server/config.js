@@ -17,11 +17,11 @@ const config = {
     // Schmitt-trigger thresholds on the smoothed music probability. Cross up
     // through enter -> death metal; down through exit -> radio. The gap between
     // them is a dead-band that stops random flapping on song dips / talk stings.
-    enterThreshold: clampNum(process.env.MUSIC_ENTER_THRESHOLD, 0.48, 0, 1),
-    exitThreshold: clampNum(process.env.MUSIC_EXIT_THRESHOLD, 0.3, 0, 1),
+    enterThreshold: clampNum(process.env.MUSIC_ENTER_THRESHOLD, 0.5, 0, 1),
+    exitThreshold: clampNum(process.env.MUSIC_EXIT_THRESHOLD, 0.42, 0, 1),
     // Seconds of sustained music before switching INTO death metal (rides the
     // host's crossfade so we don't jump on a brief sting).
-    enterHoldSeconds: clampNum(process.env.MUSIC_ENTER_HOLD_SECONDS, 4, 0, 30),
+    enterHoldSeconds: clampNum(process.env.MUSIC_ENTER_HOLD_SECONDS, 5, 0, 30),
     // Seconds of sustained speech before cutting BACK to radio. Kept short for a
     // fast exit; the dead-band (not the hold) is what prevents flapping.
     exitHoldSeconds: clampNum(process.env.MUSIC_EXIT_HOLD_SECONDS, 1, 0, 30),
