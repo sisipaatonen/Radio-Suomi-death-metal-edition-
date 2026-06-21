@@ -37,7 +37,7 @@ class Detector extends EventEmitter {
     // Tuned on real Radio Suomi: songs smooth to ~0.6-0.8, the DJ talk (often
     // over a light music bed) sits ~0.40, so exit must be ~0.42 to catch it
     // while songs stay safely above. The gap to enter (0.50) is the dead-band.
-    this.enterThreshold = opts.enterThreshold ?? 0.5; // speech -> music
+    this.enterThreshold = opts.enterThreshold ?? 0.6; // speech -> music (clear songs only)
     this.exitThreshold = opts.exitThreshold ?? 0.42; // music -> speech
     this.smoothing = opts.smoothing ?? 0.45; // EMA weight on the newest window
     // Asymmetric hold: slow into death metal (ride the host's 5-10 s crossfade),
