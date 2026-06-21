@@ -185,7 +185,7 @@ class Detector extends EventEmitter {
     const m2 = 1 - clamp01(hzcrr / 0.18); // high HZCRR -> speech
     const m3 = 1 - clamp01(energyCV / 1.4); // high energy CV -> speech
     const m4 = 1 - clamp01(fluxCV / 1.6); // steady flux -> music
-    const m5 = clamp01(subBassRatio / 0.18); // strong sub-bass -> music
+    const m5 = clamp01(subBassRatio / 0.12); // sub-bass -> music (scaled for the narrow 30-78 Hz band)
     const m6 = clamp01(highFreqRatio / 0.06); // >10 kHz -> music (weak on bandlimited radio)
 
     // Weighted blend, tuned on real Radio Suomi audio. SUB-BASS dominates: it is
