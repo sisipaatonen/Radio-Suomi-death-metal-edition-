@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Radio Death Metal Suomi · Listeners</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Metal+Mania&family=Oswald:wght@300;500;700&display=swap" rel="stylesheet" />
+    <style>
+      :root { --ink: #f3f0e7; }
+      * { box-sizing: border-box; margin: 0; }
+      body {
+        background: #000; color: var(--ink); min-height: 100vh;
+        font-family: "Oswald", system-ui, sans-serif;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 2rem; padding: 2rem; text-align: center;
+      }
+      h1 {
+        font-family: "Metal Mania", serif; font-weight: 400;
+        font-size: clamp(1.6rem, 7vw, 2.6rem); letter-spacing: 0.02em; line-height: 1;
+      }
+      .big { font-size: clamp(5rem, 30vw, 11rem); line-height: 0.9; font-weight: 700; }
+      .big-label { text-transform: uppercase; letter-spacing: 0.45em; font-size: 0.7rem; color: #8a857a; margin-top: 0.4rem; }
+      .grid { display: flex; gap: 2.5rem; flex-wrap: wrap; justify-content: center; }
+      .stat .n { font-size: 2rem; font-weight: 700; }
+      .stat .l { text-transform: uppercase; letter-spacing: 0.25em; font-size: 0.6rem; color: #8a857a; }
+      .foot { font-size: 0.65rem; color: #5a5048; letter-spacing: 0.2em; text-transform: uppercase; }
+      .dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:#f3f0e7; margin-left:0.4em; animation: pulse 1.6s infinite; }
+      @keyframes pulse { 0%,100%{opacity:.25} 50%{opacity:1} }
+    </style>
+  </head>
+  <body>
+    <h1>Radio&nbsp;Death&nbsp;Metal&nbsp;Suomi</h1>
+    <div>
+      <div id="listeners" class="big">–</div>
+      <div class="big-label">listening now<span class="dot"></span></div>
+    </div>
+    <div class="grid">
+      <div class="stat"><div id="open" class="n">–</div><div class="l">tabs open</div></div>
+      <div class="stat"><div id="peak" class="n">–</div><div class="l">peak</div></div>
+      <div class="stat"><div id="total" class="n">–</div><div class="l">sessions</div></div>
+      <div class="stat"><div id="uptime" class="n">–</div><div class="l">uptime</div></div>
+    </div>
+    <div class="foot" id="status">connecting…</div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      function fmtUptime(s) {
+        const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+        return h > 0 ? h + "h " + m + "m" : m + "m";
+      }
+      async function tick() {
+        try {
+          const r = await fetch("/api/stats", { cache: "no-store" });
+          const d = await r.json();
+          $("listeners").textContent = d.listeners;
+          $("open").textContent = d.openTabs;
+          $("peak").textContent = d.peak;
+          $("total").textContent = d.totalSessions;
+          $("uptime").textContent = fmtUptime(d.uptimeSeconds);
+          $("status").textContent = "live · updates every 5s";
+        } catch (e) {
+          $("status").textContent = "offline — retrying…";
+        }
+      }
+      tick();
+      setInterval(tick, 5000);
+    </script>
+  </body>
+</html>
