@@ -25,6 +25,16 @@ const config = {
     // Seconds of sustained speech before cutting BACK to radio. Kept short for a
     // fast exit; the dead-band (not the hold) is what prevents flapping.
     exitHoldSeconds: clampNum(process.env.MUSIC_EXIT_HOLD_SECONDS, 1, 0, 30),
+    // Short hold used INSTEAD of enterHoldSeconds when the smoothed prob is
+    // already >= highConfThreshold (clearly a loud song), so decisive songs
+    // switch fast while ambiguous audio keeps the full ride.
+    enterHoldFastSeconds: clampNum(process.env.MUSIC_ENTER_HOLD_FAST_SECONDS, 2, 0, 30),
+    highConfThreshold: clampNum(process.env.MUSIC_HIGH_CONF_THRESHOLD, 0.68, 0, 1),
+    // Absolute sub-bass floor for the m5 energy gate (raw magnitude units). A
+    // quiet voice over hum has a high sub-bass ratio but low absolute energy;
+    // below this floor m5 is ramped down. 20 = calibrated on live capture
+    // (no-op on real songs); 0 = disabled.
+    subBassFloor: clampNum(process.env.MUSIC_SUBBASS_FLOOR, 20, 0, 1e9),
   },
 
   deathMetal: {

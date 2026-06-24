@@ -72,6 +72,9 @@ const detector = new Detector({
   exitThreshold: config.detection.exitThreshold,
   enterHoldSeconds: config.detection.enterHoldSeconds,
   exitHoldSeconds: config.detection.exitHoldSeconds,
+  enterHoldFastSeconds: config.detection.enterHoldFastSeconds,
+  highConfThreshold: config.detection.highConfThreshold,
+  subBassFloor: config.detection.subBassFloor,
 });
 
 media.on('pcm', (chunk) => detector.push(chunk));

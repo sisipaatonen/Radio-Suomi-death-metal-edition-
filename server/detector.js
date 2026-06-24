@@ -45,6 +45,24 @@ class Detector extends EventEmitter {
     // quick back to radio so the talk is not missed.
     this.enterHoldSeconds = opts.enterHoldSeconds ?? 5;
     this.exitHoldSeconds = opts.exitHoldSeconds ?? 1;
+    // Confidence-adaptive entry: when the smoothed prob is already decisively
+    // high (clearly a loud song, not a talk-bed sting) the full ride is wasted
+    // dead time, so commit after enterHoldFastSeconds instead. The full
+    // enterHoldSeconds is kept only for the marginal band just above enter.
+    this.enterHoldFastSeconds = opts.enterHoldFastSeconds ?? 2;
+    // 0.68 (not 0.75): real DJ crossfades settle at smooth ~0.62-0.70, so the
+    // fast path only fires for songs that clearly clear that band; genuinely
+    // marginal audio keeps the full ride. Validated on 10 min of live capture.
+    this.highConfThreshold = opts.highConfThreshold ?? 0.68;
+    // Absolute sub-bass gate: a high sub-bass RATIO at very low ABSOLUTE energy
+    // is a quiet voice over hum/rumble, not a kick drum. Below this floor the
+    // sub-bass music cue (m5) is ramped down so it cannot trigger death metal.
+    // 20 calibrated against live capture: a clean no-op on every real song
+    // (established music sits >=27, song fade-ins >=55), it only trims dead
+    // song-tails. Raise it once a real "metal over a male voice" clip is
+    // captured to confirm the quiet-speech level. 0 = disabled. Units are the
+    // raw magnitude of this detector's FFT, so retune if FRAME/HOP/SR change.
+    this.subBassFloor = opts.subBassFloor ?? 20;
 
     this._tail = Buffer.alloc(0); // leftover bytes between pushes
     this._frames = []; // feature objects for the current texture window
@@ -173,6 +191,7 @@ class Detector extends EventEmitter {
     // pauses (where a per-frame ratio is just noise) don't inflate the bands.
     const subBassRatio = totMagSum > 0 ? subMagSum / totMagSum : 0;
     const highFreqRatio = totMagSum > 0 ? hfMagSum / totMagSum : 0;
+    const subBassAbs = subMagSum / n; // mean ABSOLUTE sub-bass magnitude this window
     const lster = lowE / n;
     const hzcrr = highZ / n;
     const energyCV = eAvg > 0 ? Math.sqrt(eVar / n) / eAvg : 0;
@@ -185,8 +204,17 @@ class Detector extends EventEmitter {
     const m2 = 1 - clamp01(hzcrr / 0.18); // high HZCRR -> speech
     const m3 = 1 - clamp01(energyCV / 1.4); // high energy CV -> speech
     const m4 = 1 - clamp01(fluxCV / 1.6); // steady flux -> music
-    const m5 = clamp01(subBassRatio / 0.08); // sub-bass -> music (narrow 30-78 Hz band; catches weak-bass songs, male talk stays low because its energy is above this band)
+    let m5 = clamp01(subBassRatio / 0.08); // sub-bass -> music (narrow 30-78 Hz band; catches weak-bass songs, male talk stays low because its energy is above this band)
     const m6 = clamp01(highFreqRatio / 0.06); // >10 kHz -> music (weak on bandlimited radio)
+
+    // Absolute-energy gate on the sub-bass cue. The false "metal over a quiet
+    // male voice" case has a high sub-bass RATIO but tiny ABSOLUTE sub-bass
+    // (a faint hum is a big fraction of a small total). Real kick/bass has high
+    // absolute energy, so it passes untouched. Soft ramp from 0.5*floor->floor.
+    if (this.subBassFloor > 0 && subBassAbs < this.subBassFloor) {
+      const half = 0.5 * this.subBassFloor;
+      m5 *= clamp01((subBassAbs - half) / half);
+    }
 
     // Weighted blend, tuned on real Radio Suomi audio. SUB-BASS dominates: it is
     // the reliable music cue (kick/bass present in songs, absent in talk). LSTER
@@ -210,7 +238,7 @@ class Detector extends EventEmitter {
     else if (this.state !== 'music' && smooth >= this.enterThreshold) rawState = 'music';
     else if (this.state === 'music' && smooth < this.exitThreshold) rawState = 'speech';
 
-    this._applyHysteresis(rawState);
+    this._applyHysteresis(rawState, smooth);
 
     this.emit('analysis', {
       state: this.state,
@@ -223,6 +251,7 @@ class Detector extends EventEmitter {
         energyCV: round(energyCV),
         fluxCV: round(fluxCV),
         subBass: round(subBassRatio),
+        subBassAbs, // raw mean absolute sub-bass magnitude (for gate calibration)
         highFreq: round(highFreqRatio),
         level: round(Math.sqrt(eAvg)),
       },
@@ -232,7 +261,7 @@ class Detector extends EventEmitter {
     });
   }
 
-  _applyHysteresis(rawState) {
+  _applyHysteresis(rawState, smooth) {
     // Each texture window is ~1 second, so switchHoldSeconds ≈ window count.
     // Counting windows (rather than wall-clock time) keeps the hold consistent
     // even when ffmpeg delivers PCM in bursts (e.g. HLS segment boundaries).
@@ -248,8 +277,15 @@ class Detector extends EventEmitter {
     }
     this._candidateWindows++;
     // Asymmetric: switching to 'music' (into death metal) needs enterHold; back
-    // to 'speech' needs only exitHold so the radio talk is cut in fast.
-    const holdSec = rawState === 'music' ? this.enterHoldSeconds : this.exitHoldSeconds;
+    // to 'speech' needs only exitHold so the radio talk is cut in fast. Entry is
+    // confidence-adaptive: a decisively-high smoothed prob (clearly a loud song)
+    // commits after the short fast hold; the marginal band keeps the full ride.
+    let holdSec;
+    if (rawState === 'music') {
+      holdSec = smooth >= this.highConfThreshold ? this.enterHoldFastSeconds : this.enterHoldSeconds;
+    } else {
+      holdSec = this.exitHoldSeconds;
+    }
     if (this._candidateWindows >= Math.max(1, Math.round(holdSec))) {
       this.state = rawState;
       this._candidate = null;
